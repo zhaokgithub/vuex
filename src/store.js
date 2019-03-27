@@ -1,16 +1,23 @@
 import applyMixin from './mixin'
 import devtoolPlugin from './plugins/devtool'
 import ModuleCollection from './module/module-collection'
-import { forEachValue, isObject, isPromise, assert } from './util'
+import {
+  forEachValue,
+  isObject,
+  isPromise,
+  assert
+} from './util'
 
 let Vue // bind on install
 
 export class Store {
-  constructor (options = {}) {
+  // 这个是在开发过程中的一些环节判断，vuex要求在创建vuex store实例之前必须先使用这个方法Vue.use(Vuex)来安装vuex，项目必须也得支持promise，store也必须通过new来创建实例
+  constructor(options = {}) {
     // Auto install if it is not done yet and `window` has `Vue`.
     // To allow users to avoid auto-installation in some cases,
     // this code should be placed here. See #731
     if (!Vue && typeof window !== 'undefined' && window.Vue) {
+      //自动执行install函数
       install(window.Vue)
     }
 
@@ -22,7 +29,7 @@ export class Store {
 
     const {
       plugins = [],
-      strict = false
+        strict = false
     } = options
 
     // store internal state
@@ -31,6 +38,10 @@ export class Store {
     this._actionSubscribers = []
     this._mutations = Object.create(null)
     this._wrappedGetters = Object.create(null)
+    /**
+     * 这里调用ModuleCollection构造函数，通过path的长度判断是否为根module，
+     * 首先进行根module的注册，然后递归遍历所有的module，子module 添加其父module的_children属性上，最终形成一棵树
+     */
     this._modules = new ModuleCollection(options)
     this._modulesNamespaceMap = Object.create(null)
     this._subscribers = []
@@ -38,11 +49,18 @@ export class Store {
 
     // bind commit and dispatch to self
     const store = this
-    const { dispatch, commit } = this
-    this.dispatch = function boundDispatch (type, payload) {
+    //=>const dispatch = this.dispatch 绑定dispatch指针
+    //=>const commit = this.commit 绑定commit指针
+    const {
+      dispatch,
+      commit
+    } = this
+    //dispatch定义位置
+    this.dispatch = function boundDispatch(type, payload) {
       return dispatch.call(store, type, payload)
     }
-    this.commit = function boundCommit (type, payload, options) {
+    //commit定义位置
+    this.commit = function boundCommit(type, payload, options) {
       return commit.call(store, type, payload, options)
     }
 
@@ -50,6 +68,9 @@ export class Store {
     this.strict = strict
 
     const state = this._modules.root.state
+    console.log('获取设置的根state值============================')
+    console.log(this._modules)
+    console.log(state)
 
     // init root module.
     // this also recursively registers all sub-modules
@@ -69,17 +90,22 @@ export class Store {
     }
   }
 
-  get state () {
+  get state() {
+    console.log('==================get state================')
     return this._vm._data.$$state
   }
 
-  set state (v) {
+  set state(v) {
     if (process.env.NODE_ENV !== 'production') {
       assert(false, `use store.replaceState() to explicit replace store state.`)
     }
   }
 
-  commit (_type, _payload, _options) {
+  commit(_type, _payload, _options) {
+    console.log('================commit=====================')
+    console.log(_type)
+    console.log(_payload)
+    console.log(_options)
     // check object-style commit
     const {
       type,
@@ -87,21 +113,36 @@ export class Store {
       options
     } = unifyObjectStyle(_type, _payload, _options)
 
-    const mutation = { type, payload }
+    const mutation = {
+      type,
+      payload
+    }
+    //这是一个函数数组
     const entry = this._mutations[type]
+    //判断当前设置的属性的值是否存在
     if (!entry) {
       if (process.env.NODE_ENV !== 'production') {
         console.error(`[vuex] unknown mutation type: ${type}`)
       }
       return
     }
+    //执行传入的函数并且初始化_committing
     this._withCommit(() => {
-      entry.forEach(function commitIterator (handler) {
+      //迭代传入的commit数组
+      entry.forEach(function commitIterator(handler) {
+        console.log('commit-handle=======================')
+        console.log(handler)
+        console.log(payload)
         handler(payload)
       })
     })
-    this._subscribers.forEach(sub => sub(mutation, this.state))
-
+    console.log('==============subscribers==================')
+    console.log(this._subscribers[0]())
+    this._subscribers.forEach((sub)=>{
+      sub(mutation, this.state)
+      console.log(sub)
+    })
+    //当开发环境是抛出警告（如果commit的属性不存在）
     if (
       process.env.NODE_ENV !== 'production' &&
       options && options.silent
@@ -113,14 +154,17 @@ export class Store {
     }
   }
 
-  dispatch (_type, _payload) {
+  dispatch(_type, _payload) {
     // check object-style dispatch
     const {
       type,
       payload
     } = unifyObjectStyle(_type, _payload)
 
-    const action = { type, payload }
+    const action = {
+      type,
+      payload
+    }
     const entry = this._actions[type]
     if (!entry) {
       if (process.env.NODE_ENV !== 'production') {
@@ -140,9 +184,9 @@ export class Store {
       }
     }
 
-    const result = entry.length > 1
-      ? Promise.all(entry.map(handler => handler(payload)))
-      : entry[0](payload)
+    const result = entry.length > 1 ?
+      Promise.all(entry.map(handler => handler(payload))) :
+      entry[0](payload)
 
     return result.then(res => {
       try {
@@ -159,29 +203,31 @@ export class Store {
     })
   }
 
-  subscribe (fn) {
+  subscribe(fn) {
     return genericSubscribe(fn, this._subscribers)
   }
 
-  subscribeAction (fn) {
-    const subs = typeof fn === 'function' ? { before: fn } : fn
+  subscribeAction(fn) {
+    const subs = typeof fn === 'function' ? {
+      before: fn
+    } : fn
     return genericSubscribe(subs, this._actionSubscribers)
   }
 
-  watch (getter, cb, options) {
+  watch(getter, cb, options) {
     if (process.env.NODE_ENV !== 'production') {
       assert(typeof getter === 'function', `store.watch only accepts a function.`)
     }
     return this._watcherVM.$watch(() => getter(this.state, this.getters), cb, options)
   }
 
-  replaceState (state) {
+  replaceState(state) {
     this._withCommit(() => {
       this._vm._data.$$state = state
     })
   }
 
-  registerModule (path, rawModule, options = {}) {
+  registerModule(path, rawModule, options = {}) {
     if (typeof path === 'string') path = [path]
 
     if (process.env.NODE_ENV !== 'production') {
@@ -195,7 +241,7 @@ export class Store {
     resetStoreVM(this, this.state)
   }
 
-  unregisterModule (path) {
+  unregisterModule(path) {
     if (typeof path === 'string') path = [path]
 
     if (process.env.NODE_ENV !== 'production') {
@@ -210,12 +256,12 @@ export class Store {
     resetStore(this)
   }
 
-  hotUpdate (newOptions) {
+  hotUpdate(newOptions) {
     this._modules.update(newOptions)
     resetStore(this, true)
   }
 
-  _withCommit (fn) {
+  _withCommit(fn) {
     const committing = this._committing
     this._committing = true
     fn()
@@ -223,7 +269,7 @@ export class Store {
   }
 }
 
-function genericSubscribe (fn, subs) {
+function genericSubscribe(fn, subs) {
   if (subs.indexOf(fn) < 0) {
     subs.push(fn)
   }
@@ -235,7 +281,9 @@ function genericSubscribe (fn, subs) {
   }
 }
 
-function resetStore (store, hot) {
+function resetStore(store, hot) {
+  console.log('================reset=======================')
+  console.log(store)
   store._actions = Object.create(null)
   store._mutations = Object.create(null)
   store._wrappedGetters = Object.create(null)
@@ -247,7 +295,7 @@ function resetStore (store, hot) {
   resetStoreVM(store, state, hot)
 }
 
-function resetStoreVM (store, state, hot) {
+function resetStoreVM(store, state, hot) {
   const oldVm = store._vm
 
   // bind store public getters
@@ -293,7 +341,7 @@ function resetStoreVM (store, state, hot) {
   }
 }
 
-function installModule (store, rootState, path, module, hot) {
+function installModule(store, rootState, path, module, hot) {
   const isRoot = !path.length
   const namespace = store._modules.getNamespace(path)
 
@@ -338,14 +386,19 @@ function installModule (store, rootState, path, module, hot) {
  * make localized dispatch, commit, getters and state
  * if there is no namespace, just use root ones
  */
-function makeLocalContext (store, namespace, path) {
+function makeLocalContext(store, namespace, path) {
   const noNamespace = namespace === ''
 
   const local = {
     dispatch: noNamespace ? store.dispatch : (_type, _payload, _options) => {
       const args = unifyObjectStyle(_type, _payload, _options)
-      const { payload, options } = args
-      let { type } = args
+      const {
+        payload,
+        options
+      } = args
+      let {
+        type
+      } = args
 
       if (!options || !options.root) {
         type = namespace + type
@@ -360,8 +413,13 @@ function makeLocalContext (store, namespace, path) {
 
     commit: noNamespace ? store.commit : (_type, _payload, _options) => {
       const args = unifyObjectStyle(_type, _payload, _options)
-      const { payload, options } = args
-      let { type } = args
+      const {
+        payload,
+        options
+      } = args
+      let {
+        type
+      } = args
 
       if (!options || !options.root) {
         type = namespace + type
@@ -379,9 +437,9 @@ function makeLocalContext (store, namespace, path) {
   // because they will be changed by vm update
   Object.defineProperties(local, {
     getters: {
-      get: noNamespace
-        ? () => store.getters
-        : () => makeLocalGetters(store, namespace)
+      get: noNamespace ?
+        () => store.getters :
+        () => makeLocalGetters(store, namespace)
     },
     state: {
       get: () => getNestedState(store.state, path)
@@ -391,7 +449,7 @@ function makeLocalContext (store, namespace, path) {
   return local
 }
 
-function makeLocalGetters (store, namespace) {
+function makeLocalGetters(store, namespace) {
   const gettersProxy = {}
 
   const splitPos = namespace.length
@@ -414,16 +472,18 @@ function makeLocalGetters (store, namespace) {
   return gettersProxy
 }
 
-function registerMutation (store, type, handler, local) {
+function registerMutation(store, type, handler, local) {
   const entry = store._mutations[type] || (store._mutations[type] = [])
-  entry.push(function wrappedMutationHandler (payload) {
+  console.log('mutations===================')
+  console.log(store._mutations)
+  entry.push(function wrappedMutationHandler(payload) {
     handler.call(store, local.state, payload)
   })
 }
 
-function registerAction (store, type, handler, local) {
+function registerAction(store, type, handler, local) {
   const entry = store._actions[type] || (store._actions[type] = [])
-  entry.push(function wrappedActionHandler (payload, cb) {
+  entry.push(function wrappedActionHandler(payload, cb) {
     let res = handler.call(store, {
       dispatch: local.dispatch,
       commit: local.commit,
@@ -446,14 +506,14 @@ function registerAction (store, type, handler, local) {
   })
 }
 
-function registerGetter (store, type, rawGetter, local) {
+function registerGetter(store, type, rawGetter, local) {
   if (store._wrappedGetters[type]) {
     if (process.env.NODE_ENV !== 'production') {
       console.error(`[vuex] duplicate getter key: ${type}`)
     }
     return
   }
-  store._wrappedGetters[type] = function wrappedGetter (store) {
+  store._wrappedGetters[type] = function wrappedGetter(store) {
     return rawGetter(
       local.state, // local state
       local.getters, // local getters
@@ -463,21 +523,26 @@ function registerGetter (store, type, rawGetter, local) {
   }
 }
 
-function enableStrictMode (store) {
-  store._vm.$watch(function () { return this._data.$$state }, () => {
+function enableStrictMode(store) {
+  store._vm.$watch(function() {
+    return this._data.$$state
+  }, () => {
     if (process.env.NODE_ENV !== 'production') {
       assert(store._committing, `do not mutate vuex store state outside mutation handlers.`)
     }
-  }, { deep: true, sync: true })
+  }, {
+    deep: true,
+    sync: true
+  })
 }
 
-function getNestedState (state, path) {
-  return path.length
-    ? path.reduce((state, key) => state[key], state)
-    : state
+function getNestedState(state, path) {
+  return path.length ?
+    path.reduce((state, key) => state[key], state) :
+    state
 }
 
-function unifyObjectStyle (type, payload, options) {
+function unifyObjectStyle(type, payload, options) {
   if (isObject(type) && type.type) {
     options = payload
     payload = type
@@ -488,10 +553,15 @@ function unifyObjectStyle (type, payload, options) {
     assert(typeof type === 'string', `expects string as the type, but found ${typeof type}.`)
   }
 
-  return { type, payload, options }
+  return {
+    type,
+    payload,
+    options
+  }
 }
 
-export function install (_Vue) {
+//防止vuex被vue重复安装，如果没有重复则执行 applyMixin
+export function install(_Vue) {
   if (Vue && _Vue === Vue) {
     if (process.env.NODE_ENV !== 'production') {
       console.error(

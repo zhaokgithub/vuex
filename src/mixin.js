@@ -1,5 +1,7 @@
 export default function (Vue) {
   const version = Number(Vue.version.split('.')[0])
+  //判断vue的版本号 如果vue1.0Vuex会将vuexInit方法放入Vue的_init方法中，
+  //而对于Vue2.0，则会将vuexinit混淆进Vue的beforeCreacte钩子中。来看一下vuexInit的代码
 
   if (version >= 2) {
     Vue.mixin({ beforeCreate: vuexInit })
@@ -18,7 +20,8 @@ export default function (Vue) {
   /**
    * Vuex init hook, injected into each instances init hooks list.
    */
-
+//从传入的options中获取store 如果是根节点则直接获取
+//如果是子节点则通过options中的parent获取
   function vuexInit () {
     const options = this.$options
     // store injection

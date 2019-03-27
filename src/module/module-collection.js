@@ -1,15 +1,20 @@
+//处理store传入的options 模块收集
 import Module from './module'
 import { assert, forEachValue } from '../util'
 
 export default class ModuleCollection {
   constructor (rawRootModule) {
+    console.log('============获取state=========================')
+    console.log(rawRootModule)
     // register root module (Vuex.Store options)
     this.register([], rawRootModule, false)
   }
 
   get (path) {
+    console.log('============获取state=========================')
+    console.log(path)
     return path.reduce((module, key) => {
-      return module.getChild(key)
+      return module.getChild(key)//
     }, this.root)
   }
 
@@ -26,6 +31,8 @@ export default class ModuleCollection {
   }
 
   register (path, rawModule, runtime = true) {
+    console.log('==============注册module======================')
+    console.log(path)
     if (process.env.NODE_ENV !== 'production') {
       assertRawModule(path, rawModule)
     }
@@ -39,6 +46,7 @@ export default class ModuleCollection {
     }
 
     // register nested modules
+    //注册module形式的
     if (rawModule.modules) {
       forEachValue(rawModule.modules, (rawChildModule, key) => {
         this.register(path.concat(key), rawChildModule, runtime)

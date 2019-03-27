@@ -60,7 +60,7 @@ export function isObject (obj) {
 export function isPromise (val) {
   return val && typeof val.then === 'function'
 }
-
+//抛出错误或警告提示
 export function assert (condition, msg) {
   if (!condition) throw new Error(`[vuex] ${msg}`)
 }

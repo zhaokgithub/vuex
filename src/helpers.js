@@ -3,6 +3,7 @@
  * @param {String} [namespace] - Module's namespace
  * @param {Object|Array} states # Object's item can be a function which accept state and getters for param, you can do something for state and getters in it.
  * @param {Object}
+ * @description 给用户提供更好的体验
  */
 export const mapState = normalizeNamespace((namespace, states) => {
   const res = {}

@@ -27,6 +27,8 @@ export default class Module {
   }
 
   getChild (key) {
+    console.log('===============获取child==================')
+    console.log(this._children)
     return this._children[key]
   }
 
